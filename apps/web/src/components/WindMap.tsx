@@ -1,11 +1,15 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 
+export type RadarLayerType = "reflectivity" | "velocity";
+
 interface WindMapProps {
   latitude: number;
   longitude: number;
   windSpeed?: string;
   windDirection?: string;
+  radarLayer?: RadarLayerType;
+  radarStationId?: string | null;
 }
 
 export default function WindMap({
@@ -13,6 +17,8 @@ export default function WindMap({
   longitude,
   windSpeed,
   windDirection,
+  radarLayer = "reflectivity",
+  radarStationId,
 }: WindMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<L.Map | null>(null);
@@ -34,19 +40,35 @@ export default function WindMap({
       maxZoom: 19,
     }).addTo(map);
 
-    const radarLayer = L.tileLayer.wms(
-      "https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows",
-      {
-        version: "1.3.0",
-        layers: "conus_bref_qcd",
-        styles: "",
-        format: "image/png",
-        transparent: true,
-        opacity: 0.65,
-        attribution: "NOAA/NWS",
-      },
-    );
-    radarLayer.addTo(map);
+    // Radar overlay
+    if (radarLayer === "reflectivity") {
+      L.tileLayer.wms(
+        "https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows",
+        {
+          version: "1.3.0",
+          layers: "conus_bref_qcd",
+          styles: "",
+          format: "image/png",
+          transparent: true,
+          opacity: 0.65,
+          attribution: "NOAA/NWS",
+        },
+      ).addTo(map);
+    } else if (radarLayer === "velocity" && radarStationId) {
+      const stationLower = radarStationId.toLowerCase();
+      L.tileLayer.wms(
+        `https://opengeo.ncep.noaa.gov/geoserver/${stationLower}/${stationLower}_sr_bvel/ows`,
+        {
+          version: "1.3.0",
+          layers: `${stationLower}_sr_bvel`,
+          styles: "",
+          format: "image/png",
+          transparent: true,
+          opacity: 0.75,
+          attribution: "NOAA/NWS",
+        },
+      ).addTo(map);
+    }
 
     const marker = L.marker([latitude, longitude]).addTo(map);
 
@@ -56,13 +78,21 @@ export default function WindMap({
       if (windSpeed) popupContent += `Wind: ${windSpeed}<br/>`;
       if (windDirection) popupContent += `Direction: ${windDirection}`;
     }
+    if (radarStationId) {
+      popupContent += `<br/><br/>Radar: ${radarStationId}`;
+    }
     marker.bindPopup(popupContent).openPopup();
 
     return () => {
       map.remove();
       leafletMapRef.current = null;
     };
-  }, [latitude, longitude, windSpeed, windDirection]);
+  }, [latitude, longitude, windSpeed, windDirection, radarLayer, radarStationId]);
 
-  return <div ref={mapRef} className="w-full h-96 rounded-lg border" />;
+  return (
+    <div
+      ref={mapRef}
+      className="w-full h-80 lg:h-[28rem] rounded-lg border"
+    />
+  );
 }

@@ -29,6 +29,66 @@ type ZippopotamResponse = {
   places: ZippopotamPlace[];
 };
 
+type WeatherGovGridValue = {
+  validTime?: string;
+  value?: number | null;
+};
+
+type WeatherGovGridLayer = {
+  uom?: string;
+  values: WeatherGovGridValue[];
+};
+
+function getGridLayer(value: unknown): WeatherGovGridLayer {
+  if (!value || typeof value !== "object" || !("values" in value)) {
+    return { values: [] };
+  }
+  const layer = value as { uom?: unknown; values?: unknown };
+  const values = layer.values;
+  if (!Array.isArray(values)) {
+    return { values: [] };
+  }
+  return {
+    uom: typeof layer.uom === "string" ? layer.uom : undefined,
+    values: values.filter(
+      (item): item is WeatherGovGridValue =>
+        Boolean(item) && typeof item === "object" && "validTime" in item,
+    ),
+  };
+}
+
+function validTimeCoversStart(validTime: string | undefined, startTime: string) {
+  if (!validTime) return false;
+  const [start, duration] = validTime.split("/");
+  const validStart = new Date(start);
+  const periodStart = new Date(startTime);
+  if (Number.isNaN(validStart.getTime()) || Number.isNaN(periodStart.getTime())) {
+    return false;
+  }
+  const hours = duration?.match(/^PT(\d+)H$/)?.[1];
+  const validEnd = new Date(validStart);
+  validEnd.setHours(validEnd.getHours() + Number(hours ?? 1));
+  return validStart <= periodStart && periodStart < validEnd;
+}
+
+function convertWindSpeedToMph(value: number, uom?: string) {
+  if (uom === "wmoUnit:km_h-1") {
+    return Math.round(value * 0.621371);
+  }
+  if (uom === "wmoUnit:m_s-1") {
+    return Math.round(value * 2.23694);
+  }
+  if (uom === "wmoUnit:mi_h-1") {
+    return Math.round(value);
+  }
+  return Math.round(value * 2.23694);
+}
+
+function formatWindGust(value: number | null | undefined, uom?: string) {
+  if (value === null || value === undefined) return undefined;
+  return `${convertWindSpeedToMph(value, uom)} mph`;
+}
+
 async function geocodeZipCode(zipCode: string): Promise<{ latitude: number; longitude: number; place: string; state: string }> {
   const response = await fetch(`https://api.zippopotam.us/us/${encodeURIComponent(zipCode)}`, {
     headers: { "User-Agent": "(WindAppForGreg, weather.rmcd.cc)" },
@@ -166,17 +226,36 @@ export const weatherGovRouter = router({
       ),
     ),
 
-  getHourlyForecastForZip: publicProcedure
-    .input(WeatherGovZipInputSchema)
-    .query(async ({ ctx, input }) => {
-      const location = await geocodeZipCode(input.zipCode);
-      const result = await ctx.weatherGov.getHourlyForecastForPoint(
-        location.latitude,
-        location.longitude,
-        { units: input.units },
-      );
+	  getHourlyForecastForZip: publicProcedure
+	    .input(WeatherGovZipInputSchema)
+	    .query(async ({ ctx, input }) => {
+	      const location = await geocodeZipCode(input.zipCode);
+	      const result = await ctx.weatherGov.getHourlyForecastForPoint(
+	        location.latitude,
+	        location.longitude,
+	        { units: input.units },
+	      );
 
-      const periods = result.response.data.properties.periods.slice(0, 24);
+	      let windGustLayer: WeatherGovGridLayer = { values: [] };
+	      const gridpointUrl = result.point.data.properties.forecastGridData;
+	      if (gridpointUrl) {
+	        const gridpoint = await ctx.weatherGov.getGridpoint(gridpointUrl);
+	        windGustLayer = getGridLayer(gridpoint.data.properties.windGust);
+	      }
+
+	      const periods = result.response.data.properties.periods
+	        .slice(0, 24)
+	        .map((period) => {
+	          const gust = windGustLayer.values.find((value) =>
+	            period.startTime
+	              ? validTimeCoversStart(value.validTime, period.startTime)
+	              : false,
+	          );
+	          return {
+	            ...period,
+	            windGust: formatWindGust(gust?.value, windGustLayer.uom),
+	          };
+	        });
 
       return {
         location,
@@ -192,5 +271,15 @@ export const weatherGovRouter = router({
           },
         },
       };
+    }),
+
+  getNearestRadarStation: publicProcedure
+    .input(WeatherGovPointInputSchema)
+    .query(async ({ ctx, input }) => {
+      const station = await ctx.weatherGov.getNearestRadarStation(
+        input.latitude,
+        input.longitude,
+      );
+      return station;
     }),
 });

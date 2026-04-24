@@ -16,6 +16,8 @@ import type {
   WeatherGovPointLinkedResponse,
   WeatherGovPointObservationResponse,
   WeatherGovProblemDetail,
+  WeatherGovRadarStation,
+  WeatherGovRadarStationCollection,
   WeatherGovRequestOptions,
   WeatherGovResponseMeta,
   WeatherGovStation,
@@ -366,6 +368,38 @@ export class WeatherGovClient {
     };
   }
 
+  async getRadarStations(): Promise<WeatherGovApiResponse<WeatherGovRadarStationCollection>> {
+    return this.request<WeatherGovRadarStationCollection>("/radar/stations");
+  }
+
+  async getNearestRadarStation(
+    latitude: number,
+    longitude: number,
+  ): Promise<WeatherGovRadarStation | null> {
+    const stations = await this.getRadarStations();
+    let nearest: WeatherGovRadarStation | null = null;
+    let minDistance = Infinity;
+
+    for (const feature of stations.data.features) {
+      const coords = feature.geometry?.coordinates;
+      if (
+        !Array.isArray(coords) ||
+        coords.length < 2 ||
+        typeof coords[0] !== "number" ||
+        typeof coords[1] !== "number"
+      ) {
+        continue;
+      }
+      const distance = haversineDistance(latitude, longitude, coords[1], coords[0]);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = feature;
+      }
+    }
+
+    return nearest;
+  }
+
   private buildUrl(
     pathOrUrl: string,
     query?: WeatherGovRequestOptions["query"],
@@ -610,4 +644,27 @@ function buildActiveAlertsZonePath(zoneIdOrUrl: string): string {
 function extractZoneId(pathname: string): string | undefined {
   const match = pathname.match(/\/zones\/[^/]+\/([^/]+)$/);
   return match?.[1];
+}
+
+function haversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6371; // Earth radius in km
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function toRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
 }

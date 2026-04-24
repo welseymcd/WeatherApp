@@ -286,3 +286,24 @@ export type WeatherGovPointObservationResponse = {
   station: WeatherGovStation;
   observation: WeatherGovApiResponse<WeatherGovObservation>;
 };
+
+export type WeatherGovRadarStationProperties = {
+  "@id"?: string;
+  "@type"?: string;
+  id?: string;
+  name?: string;
+  stationType?: string;
+  elevation?: WeatherGovQuantitativeValue;
+  timeZone?: string;
+  latency?: Record<string, unknown>;
+  rda?: Record<string, unknown>;
+  performance?: Record<string, unknown>;
+  adaptation?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+export type WeatherGovRadarStation =
+  WeatherGovGeoJsonFeature<WeatherGovRadarStationProperties>;
+
+export type WeatherGovRadarStationCollection =
+  WeatherGovGeoJsonFeatureCollection<WeatherGovRadarStationProperties>;

@@ -20,7 +20,7 @@ let pointResponse: Awaited<ReturnType<typeof client.resolvePoint>>;
 let stationId: string;
 let zoneId: string;
 
-describe.sequential("WeatherGovClient live integration", () => {
+describe("WeatherGovClient live integration", () => {
   beforeAll(async () => {
     pointResponse = await client.resolvePoint(TEST_LATITUDE, TEST_LONGITUDE);
     stationId = await resolveFirstStationId();

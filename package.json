@@ -1,0 +1,29 @@
+{
+  "name": "wind-app-for-greg",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "wrangler dev --config apps/server/wrangler.toml",
+    "dev:web": "cd apps/web && bun run dev",
+    "build:web": "cd apps/web && bun run build",
+    "build": "cd apps/web && bun run build && cd ../.. && wrangler deploy --dry-run --outdir dist/worker --config apps/server/wrangler.toml",
+    "test": "bunx --bun vitest run",
+    "test:weather-gov-live": "bunx --bun vitest run --config vitest.live.config.ts",
+    "cf:deploy": "wrangler deploy --config apps/server/wrangler.toml",
+    "cf:dev": "wrangler dev --config apps/server/wrangler.toml",
+    "cf:types": "wrangler types apps/server/src/worker-configuration.d.ts --config apps/server/wrangler.toml",
+    "d1:migrations:apply": "wrangler d1 migrations apply wind-app-for-greg --config apps/server/wrangler.toml",
+    "d1:migrations:apply:local": "wrangler d1 migrations apply wind-app-for-greg --local --config apps/server/wrangler.toml"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.33.1",
+    "@rollup/rollup-darwin-arm64": "4.60.2",
+    "vitest": "4.0.7",
+    "wrangler": "4.84.1"
+  },
+  "dependencies": {
+    "@trpc/server": "11.16.0",
+    "zod": "^4.3.6"
+  }
+}

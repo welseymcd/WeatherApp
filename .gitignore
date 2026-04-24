@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+
+# Local secrets and environment files
+.env
+.env.*
+*.local
+*.pem
+*.p12
+*.p8
+id_rsa*
+id_ed25519*
+
+# Generated Cloudflare output can appear below app folders.
+**/.wrangler/
+**/dist/
+**/build/
+coverage/
